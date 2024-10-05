@@ -17,6 +17,12 @@ declare module 'vue' {
   }
 }
 
+declare module '@vue/runtime-core' {
+  export interface GlobalComponents {
+    LottiePlayer: (typeof import('vue3-lottie'))['Vue3Lottie']
+  }
+}
+
 declare module '*.vue' {
   import type { DefineComponent } from 'vue'
 

@@ -1,7 +1,44 @@
 <template>
   <div>
-    <h1>Home Page</h1>
+    <n-grid :x-gap="12" :y-gap="8" cols="400:1 800:2 1500:3 1800:4 2100:5">
+      <n-grid-item v-for="device in devices.value" :key="device.mac">
+        <c-device :device="device" />
+      </n-grid-item>
+    </n-grid>
   </div>
 </template>
 
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { AxiosError } from 'axios'
+import { getCurrentInstance, reactive } from 'vue'
+import { InfoDevice, DeviceResponse } from '../interface/device'
+
+/* import lib component */
+import { NGrid, NGridItem } from 'naive-ui'
+
+/* import custom component */
+import CDevice from '../components/Device.vue'
+
+interface ListDeviceInfo extends DeviceResponse {
+  info: InfoDevice[]
+}
+
+/* get globalProperties */
+const axios = getCurrentInstance()?.appContext.config.globalProperties.$axios
+
+const devices = reactive<{ value: InfoDevice[] }>({ value: [] })
+
+if (axios) {
+  axios
+    .get('/device/info/list')
+    .then((response) => {
+      const _devices: ListDeviceInfo = response.data
+      devices.value = _devices.info
+    })
+    .catch((error) => {
+      if (error instanceof AxiosError) {
+        console.log(error.message)
+      }
+    })
+}
+</script>

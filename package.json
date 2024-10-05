@@ -21,16 +21,21 @@
     "build:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
+    "@canvasjs/vue-charts": "^1.0.4",
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
+    "@flaticon/flaticon-uicons": "^3.3.1",
     "@vicons/ionicons5": "^0.12.0",
     "@vueuse/core": "^11.1.0",
     "axios": "^1.7.7",
+    "chart.js": "^4.4.4",
     "electron-updater": "^6.1.7",
     "jwt-decode": "^4.0.0",
     "pinia": "^2.2.4",
     "socket.io-client": "^4.8.0",
-    "vue-router": "4"
+    "vue-chart-3": "^3.1.8",
+    "vue-router": "4",
+    "vue3-lottie": "^3.3.1"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config": "^1.0.2",

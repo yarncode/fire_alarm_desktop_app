@@ -5,7 +5,7 @@
         <menu-side />
       </n-layout-sider>
       <n-layout>
-        <n-layout-content class="h-full">
+        <n-layout-content class="h-full px-10 py-5">
           <!-- main content -->
           <router-view v-slot="{ Component, route }">
             <transition name="fade" mode="out-in">
