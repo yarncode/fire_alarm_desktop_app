@@ -38,102 +38,32 @@
         </n-card>
       </div>
     </div>
-    <div class="flex">
-      <CanvasJSChart
-        class="mt-2"
-        :options="chartOptions.temperature"
-        :styles="chartStyle.temperature"
-        @chart-ref="chartRef"
-      />
+    <div class="flex overflow-hidden mt-4">
+      <LineChart class="w-full" v-bind="lineChartProps" />
     </div>
   </n-card>
 </template>
 
 <script setup lang="ts">
-import { InfoDevice, InfoSensor, SocketPayloadSensor } from '../interface/device'
+import { InfoDevice, NodeStateType } from '../interface/device'
+import { InfoSensor, SocketPayloadSensor, SensorInfoSummary } from '../interface/sensor'
 import { NCard } from 'naive-ui'
-import { onUnmounted, reactive, ref } from 'vue'
+import { onUnmounted, reactive, getCurrentInstance } from 'vue'
 import { useSocketStore } from '../store/socket'
 import { useProfileStore } from '../store/profile'
+import { AxiosError } from 'axios'
+import { LineChart, useLineChart } from 'vue-chart-3'
+import { Chart, registerables, ChartData, Point, ChartOptions } from 'chart.js'
+import { enUS } from 'date-fns/locale'
+
+Chart.register(...registerables)
 
 /* local icon */
 import _urlWiFiOnlineIcon from '../assets/icon/lottie/wifi-online.json'
 import _urlWiFiOfflineIcon from '../assets/icon/lottie/wifi-offline.json'
 
-/* option for chart */
-const chartOptions = reactive<{
-  temperature: unknown
-}>({
-  temperature: {
-    animationEnabled: true,
-    theme: 'dark2', // "light1", "light2", "dark1", "dark2"
-    toolTip: {
-      shared: true
-    },
-    title: {
-      text: 'History Sensor'
-    },
-    axisY: {},
-    axisX: {
-      valueFormatString: 'DD MMM'
-    },
-    legend: {
-      cursor: 'pointer',
-      itemclick: function (e) {
-        if (typeof e.dataSeries.visible === 'undefined' || e.dataSeries.visible) {
-          e.dataSeries.visible = false
-        } else {
-          e.dataSeries.visible = true
-        }
-        e.chart.render()
-      }
-    },
-    data: [
-      {
-        type: 'splineArea',
-        showInLegend: 'true',
-        name: 'Temperature',
-        yValueFormatString: '#0.#%',
-        color: '#80DEEA',
-        xValueType: 'dateTime',
-        xValueFormatString: 'DD MMM YY HH:mm',
-        legendMarkerType: 'square',
-        dataPoints: [
-          { x: new Date('2020-01-01'), y: 81 },
-          { x: new Date('2020-01-08'), y: 88 },
-          { x: new Date('2020-01-15'), y: 87 },
-          { x: new Date('2020-01-22'), y: 93 },
-          { x: new Date('2020-01-29'), y: 91 },
-          { x: new Date('2020-02-05'), y: 102 },
-          { x: new Date('2020-02-12'), y: 101 },
-          { x: new Date('2020-02-19'), y: 93 },
-          { x: new Date('2020-02-26'), y: 87 },
-          { x: new Date('2020-03-04'), y: 79 },
-          { x: new Date('2020-03-11'), y: 52 },
-          { x: new Date('2020-03-18'), y: 67 },
-          { x: new Date('2020-03-25'), y: 64 },
-          { x: new Date('2020-04-01'), y: 71 },
-          { x: new Date('2020-04-08'), y: 68 },
-          { x: new Date('2020-04-15'), y: 68 },
-          { x: new Date('2020-04-22'), y: 78 },
-          { x: new Date('2020-04-29'), y: 90 },
-          { x: new Date('2020-05-06'), y: 88 },
-          { x: new Date('2020-05-13'), y: 97 },
-          { x: new Date('2020-05-20'), y: 88 }
-        ]
-      }
-    ]
-  }
-})
-
-/* style chart */
-const chartStyle = {
-  temperature: {
-    width: '100%',
-    height: '300px',
-    float: 'left'
-  }
-}
+/* get globalProperties */
+const axios = getCurrentInstance()?.appContext.config.globalProperties.$axios
 
 /* socket store */
 const { socketIo } = useSocketStore()
@@ -146,7 +76,6 @@ const props = defineProps<{
 const eventNameStatus = `${userId}/${props.device.id}/status`
 const eventNameSensor = `${userId}/${props.device.id}/sensor`
 
-const charts = ref<unknown[]>([])
 const _device = reactive<{ value: InfoDevice }>({
   value: props.device
 })
@@ -158,18 +87,116 @@ const _sensor = reactive<{ value: InfoSensor }>({
   }
 })
 
-const chartRef = (chartInstance) => {
-  charts.value.push(chartInstance)
+const _chartOptions = reactive<ChartOptions<'line'>>({
+  scales: {
+    myScale: {
+      type: 'time',
+      axis: 'x',
+      date: {
+        locale: enUS
+      }
+    }
+  },
+  elements: {
+    line: {
+      tension: 0.4,
+      borderWidth: 0.8
+    },
+    point: {
+      radius: 2
+    }
+  }
+})
+
+const _chartData = reactive<ChartData<'line'>>({
+  // labels: ['Paris', 'Nîmes', 'Toulon', 'Perpignan', 'Autre'],
+  // labels: [],
+  datasets: [
+    {
+      data: [],
+      backgroundColor: '#0079AF',
+      borderColor: '#0079AF',
+      label: 'Temperature'
+    },
+    {
+      data: [],
+      backgroundColor: '#4DFF56FF',
+      borderColor: '#4DFF56FF',
+      label: 'Humidity'
+    },
+    {
+      data: [],
+      backgroundColor: '#FFAC4DFF',
+      borderColor: '#FFAC4DFF',
+      label: 'Smoke'
+    }
+  ]
+})
+
+const { lineChartProps } = useLineChart({
+  chartData: _chartData,
+  options: _chartOptions
+})
+
+if (axios) {
+  axios
+    .get(`/sensor/info/${_device.value.id}?time=${300}`)
+    .then((response) => {
+      const sensorInfo: { info: SensorInfoSummary } = response.data
+      // console.log('sensor info: ', sensorInfo)
+      _chartData.datasets[0].data = sensorInfo.info.temperature.map(
+        (item) =>
+          ({
+            x: new Date(item.update_at).getTime(),
+            y: Number(item.value)
+          }) as Point
+      )
+      _chartData.datasets[1].data = sensorInfo.info.humidity.map(
+        (item) =>
+          ({
+            x: new Date(item.update_at).getTime(),
+            y: Number(item.value)
+          }) as Point
+      )
+      _chartData.datasets[2].data = sensorInfo.info.smoke.map(
+        (item) =>
+          ({
+            x: new Date(item.update_at).getTime(),
+            y: Number(item.value)
+          }) as Point
+      )
+    })
+    .catch((error) => {
+      if (error instanceof AxiosError) {
+        console.log(error.message)
+      }
+    })
 }
 
-socketIo.on(eventNameStatus, (payload: unknown) => {
+socketIo.on(eventNameStatus, (payload: { status: NodeStateType }) => {
   console.log('status: ', socketIo.id, payload)
+  _device.value.status = payload.status
 })
 
 socketIo.on(eventNameSensor, (payload: SocketPayloadSensor) => {
   _sensor.value.temperature = payload.env.temperature.value
   _sensor.value.humidity = payload.env.humidity.value
   _sensor.value.smoke = payload.smoke.value
+
+  _chartData.datasets[0].data.push({
+    x: new Date(payload.env.temperature.time_at).getTime(),
+    y: Number(payload.env.temperature.value)
+  } as Point)
+
+  _chartData.datasets[1].data.push({
+    x: new Date(payload.env.humidity.time_at).getTime(),
+    y: Number(payload.env.humidity.value)
+  } as Point)
+
+  _chartData.datasets[2].data.push({
+    x: new Date(payload.smoke.time_at).getTime(),
+    y: Number(payload.smoke.value)
+  } as Point)
 })
 
 onUnmounted(() => {

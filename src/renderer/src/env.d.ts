@@ -18,6 +18,9 @@ declare module 'vue' {
 }
 
 declare module '@vue/runtime-core' {
+  interface ComponentCustomProperties {
+    $apexcharts: typeof ApexCharts
+  }
   export interface GlobalComponents {
     LottiePlayer: (typeof import('vue3-lottie'))['Vue3Lottie']
   }
