@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="h-full">
     <n-grid :x-gap="12" :y-gap="8" cols="400:1 800:2 1500:3 1800:4 2100:5">
       <n-grid-item v-for="device in devices.value" :key="device.mac">
         <c-device :device="device" />

@@ -7,6 +7,7 @@
       :rules="rules"
       size="large"
       style="margin: 1rem 0"
+      @keydown.enter="submitForm"
     >
       <n-form-item label="Email" path="email">
         <n-input v-model:value="formValue.email" clearable placeholder="example: abc@gmail.com" />

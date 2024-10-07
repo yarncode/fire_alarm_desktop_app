@@ -6,7 +6,14 @@
       :key="item.label"
       @click="handleItemClick(item)"
     >
-      {{ item.label }}
+      <div class="flex justify-start">
+        <component
+          :is="'i'"
+          :class="item.icon"
+          class="mr-2 items-center leading-none mt-0.5"
+        ></component>
+        <span>{{ item.label }}</span>
+      </div>
     </n-list-item>
   </n-list>
 </template>
@@ -24,6 +31,7 @@ interface MenuItemCustom {
   type: MenuItemType
   label: string
   nameRoute?: string
+  icon: unknown | string
   action?: () => void
 }
 /* constants variables */
@@ -38,16 +46,19 @@ const listMenu: Array<MenuItemCustom> = [
   {
     label: 'Home',
     type: 'route',
-    nameRoute: 'Home'
+    nameRoute: 'Home',
+    icon: 'fi fi-rr-house-blank'
   },
   {
     label: 'Profile',
     type: 'route',
-    nameRoute: 'Profile'
+    nameRoute: 'Profile',
+    icon: 'fi fi-rr-user'
   },
   {
     label: 'Logout',
     type: 'action',
+    icon: 'fi fi-ts-arrow-left-from-arc',
     action() {
       /* do something here */
       dialog.warning({
