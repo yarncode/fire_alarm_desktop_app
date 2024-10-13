@@ -1,5 +1,5 @@
 <template>
-  <n-tabs type="segment" animated>
+  <n-tabs class="" type="segment" animated>
     <n-tab-pane name="data-log" tab="Monitor">
       <n-card :title="props.device.name" size="small">
         <template #header-extra>
@@ -11,37 +11,81 @@
           >
           </lottie-player>
         </template>
-        <div class="flex">
-          <div class="flex-1">
-            <n-card>
-              <template #header> <span class="text-sm"> Temperature </span> </template>
-              <template #header-extra>
-                <i class="fi fi-rr-temperature-high leading-none"></i>
-              </template>
-              <p class="text-center text-3xl mb-2">{{ _sensor.value.temperature.toFixed(1) }}</p>
-              <p class="text-center text-3xl">°C</p>
-            </n-card>
+        <div class="relative">
+          <div class="flex">
+            <div class="flex-1">
+              <!-- highlightSensor.temperature -->
+              <n-card :class="{ 'highlight-sensor': highlightSensor.temperature }">
+                <template #header> <span class="text-sm"> Temperature </span> </template>
+                <template #header-extra>
+                  <i class="fi fi-rr-temperature-high leading-none"></i>
+                </template>
+                <p class="text-center text-3xl mb-2">{{ _sensor.value.temperature.toFixed(1) }}</p>
+                <p class="text-center text-3xl">°C</p>
+              </n-card>
+            </div>
+            <div class="flex-1">
+              <n-card :class="{ 'highlight-sensor': highlightSensor.humidity }">
+                <template #header> <span class="text-sm"> Humidiry </span> </template>
+                <template #header-extra> <i class="fi fi-rr-humidity leading-none"></i> </template>
+                <p class="text-center text-3xl mb-2">{{ _sensor.value.humidity.toFixed(1) }}</p>
+                <p class="text-center text-3xl">%</p>
+                <!-- <line-chart /> -->
+              </n-card>
+            </div>
+            <div class="flex-1">
+              <n-card :class="{ 'highlight-sensor': highlightSensor.smoke }">
+                <template #header> <span class="text-sm"> Smoke </span> </template>
+                <template #header-extra> <i class="fi fi-tr-smoking leading-none"></i> </template>
+                <p class="text-center text-3xl mb-2">{{ _sensor.value.smoke.toFixed(0) }}</p>
+                <p class="text-center text-3xl">ppm</p>
+              </n-card>
+            </div>
           </div>
-          <div class="flex-1">
-            <n-card>
-              <template #header> <span class="text-sm"> Humidiry </span> </template>
-              <template #header-extra> <i class="fi fi-rr-humidity leading-none"></i> </template>
-              <p class="text-center text-3xl mb-2">{{ _sensor.value.humidity.toFixed(1) }}</p>
-              <p class="text-center text-3xl">%</p>
-              <!-- <line-chart /> -->
-            </n-card>
+          <div class="flex overflow-hidden mt-4">
+            <LineChart class="w-full" v-bind="lineChartProps" />
           </div>
-          <div class="flex-1">
-            <n-card>
-              <template #header> <span class="text-sm"> Smoke </span> </template>
-              <template #header-extra> <i class="fi fi-tr-smoking leading-none"></i> </template>
-              <p class="text-center text-3xl mb-2">{{ _sensor.value.smoke.toFixed(0) }}</p>
-              <p class="text-center text-3xl">ppm</p>
-            </n-card>
+          <!-- start box notify -->
+          <div
+            :class="warningFirePayload.state ? 'opacity-100' : 'opacity-0 pointer-events-none'"
+            class="absolute w-full h-full top-0 left-0 backdrop-blur-sm transition-opacity"
+          >
+            <!-- this is modal -->
+            <n-element
+              tag="div"
+              style="background-color: var(--card-color)"
+              class="overflow-hidden h-fit absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1/2 rounded-3xl"
+            >
+              <!-- this icon notify -->
+              <div class="px-5 pt-5 border-2 border-red-400 border-b-0 rounded-3xl rounded-b-none">
+                <lottie-player class="w-16 h-16" :animation-data="_urlBlinkNotifyIcon" />
+                <p class="text-sm py-2 w-full text-slate-400">
+                  Warning: {{ warningFirePayload.message }}
+                </p>
+                <n-radio
+                  class="pb-2"
+                  :checked="_setting.device.value.hideWarning"
+                  name="modal-never-show"
+                  @click="handleCheckShowModal"
+                >
+                  Dont show again.
+                </n-radio>
+              </div>
+              <div class="flex">
+                <button
+                  class="w-full bg-red-400 hover:bg-red-500 p-2 transition-colors"
+                  @click="
+                    () => {
+                      warningFirePayload.state = false
+                      _audio.stop(AudioType.AUDIO_WARNING, { id: props.device.id })
+                    }
+                  "
+                >
+                  OK, i know
+                </button>
+              </div>
+            </n-element>
           </div>
-        </div>
-        <div class="flex overflow-hidden mt-4">
-          <LineChart class="w-full" v-bind="lineChartProps" />
         </div>
       </n-card>
     </n-tab-pane>
@@ -85,7 +129,7 @@
               v-model:value="formValue.rangeNotify.smoke"
               range
               :min="200"
-              :max="2000"
+              :max="10000"
               :step="10"
               :format-tooltip="(smoke) => `${smoke} (ppm)`"
             />
@@ -147,6 +191,7 @@
 import { InfoDevice, NodeStateType } from '../interface/device'
 import { InfoSensor, SocketPayloadSensor, SensorInfoSummary } from '../interface/sensor'
 import {
+  NRadio,
   NCard,
   NTabPane,
   NTabs,
@@ -155,15 +200,19 @@ import {
   NFormItem,
   NSlider,
   NInput,
-  NButton
+  NButton,
+  NElement
 } from 'naive-ui'
 import { onUnmounted, reactive, ref, getCurrentInstance } from 'vue'
 import { useSocketStore } from '../store/socket'
 import { useProfileStore } from '../store/profile'
+import { useSettingStore } from '../store/setting'
+import { useAudioStore, AudioType } from '../store/audio'
 import { AxiosError } from 'axios'
 import { LineChart, useLineChart } from 'vue-chart-3'
 import { Chart, registerables, ChartData, Point, ChartOptions } from 'chart.js'
 import { enUS } from 'date-fns/locale'
+import { storeToRefs } from 'pinia'
 
 Chart.register(...registerables)
 
@@ -172,6 +221,7 @@ import _urlWiFiOnlineIcon from '../assets/icon/lottie/wifi-online.json'
 import _urlWiFiOfflineIcon from '../assets/icon/lottie/wifi-offline.json'
 import _urlSmokeIcon from '../assets/icon/lottie/smoke.json'
 import _urlTemperatureIcon from '../assets/icon/lottie/temperature.json'
+import _urlBlinkNotifyIcon from '../assets/icon/lottie/blink_notify.json'
 
 /* get globalProperties */
 const axios = getCurrentInstance()?.appContext.config.globalProperties.$axios
@@ -179,6 +229,9 @@ const axios = getCurrentInstance()?.appContext.config.globalProperties.$axios
 /* socket store */
 const { socketIo } = useSocketStore()
 const { id: userId } = useProfileStore()
+const _audio = useAudioStore()
+const _settingStore = useSettingStore()
+const _setting = storeToRefs(_settingStore)
 
 /* define props */
 const props = defineProps<{
@@ -194,12 +247,28 @@ const rules = {
   //   validator: validateEmail
   // }
 }
+const highlightSensor = reactive<{
+  temperature: boolean
+  humidity: boolean
+  smoke: boolean
+}>({
+  temperature: false,
+  humidity: false,
+  smoke: false
+})
+const warningFirePayload = reactive<{
+  state: boolean
+  message: string
+}>({
+  state: false,
+  message: 'Temperature is too high'
+})
 const formRef = ref<FormInst | null>(null)
 const formValue = reactive({
   name: props.device.name,
   desc: props.device.desc,
   rangeNotify: {
-    smoke: [300, 1500],
+    smoke: [300, 7000],
     temperature: [50, 100],
     humidity: [0, 100]
   }
@@ -272,6 +341,10 @@ const { lineChartProps } = useLineChart({
   options: _chartOptions
 })
 
+const handleCheckShowModal = () => {
+  _settingStore.setHideWarning(!_setting.device.value.hideWarning)
+}
+
 const submitForm = () => {}
 
 if (axios) {
@@ -321,9 +394,9 @@ socketIo.on(eventNameStatus, (payload: { status: NodeStateType }) => {
 })
 
 socketIo.on(eventNameSensor, (payload: SocketPayloadSensor) => {
-  _sensor.value.temperature = payload.env.temperature.value
-  _sensor.value.humidity = payload.env.humidity.value
-  _sensor.value.smoke = payload.smoke.value
+  _sensor.value.temperature = payload.env.temperature.value || 0
+  _sensor.value.humidity = payload.env.humidity.value || 0
+  _sensor.value.smoke = payload.smoke.value || 0
 
   _chartData.datasets[0].data.push({
     x: new Date(payload.env.temperature.time_at).getTime(),
@@ -339,6 +412,59 @@ socketIo.on(eventNameSensor, (payload: SocketPayloadSensor) => {
     x: new Date(payload.smoke.time_at).getTime(),
     y: Number(payload.smoke.value)
   } as Point)
+
+  let startNotify: boolean = false
+  let message: string = ''
+
+  if (
+    _sensor.value.temperature >= formValue.rangeNotify.temperature[0] &&
+    _sensor.value.temperature <= formValue.rangeNotify.temperature[1]
+  ) {
+    startNotify = true
+    message += '- Temperature cross the threshold value\n'
+    highlightSensor.temperature = true
+  } else {
+    highlightSensor.temperature = false
+  }
+
+  if (
+    _sensor.value.humidity >= formValue.rangeNotify.humidity[0] &&
+    _sensor.value.humidity <= formValue.rangeNotify.humidity[1]
+  ) {
+    startNotify = true
+    message += '- Humidity cross the threshold value\n'
+    highlightSensor.humidity = true
+  } else {
+    highlightSensor.humidity = false
+  }
+
+  if (
+    _sensor.value.smoke >= formValue.rangeNotify.smoke[0] &&
+    _sensor.value.smoke <= formValue.rangeNotify.smoke[1]
+  ) {
+    startNotify = true
+    message += '- Smoke cross the threshold value\n'
+    highlightSensor.smoke = true
+  } else {
+    highlightSensor.smoke = false
+  }
+
+  if (startNotify) {
+    warningFirePayload.message = message
+
+    if (_setting.device.value.hideWarning === false) {
+      warningFirePayload.state = true
+    }
+
+    _audio.start(AudioType.AUDIO_WARNING, {
+      id: _device.value.id
+    })
+  } else {
+    /* stop warning if value is normal */
+    if (_audio.existDeviceWarning(_device.value.id)) {
+      _audio.stop(AudioType.AUDIO_WARNING, { id: _device.value.id })
+    }
+  }
 })
 
 onUnmounted(() => {
@@ -346,3 +472,22 @@ onUnmounted(() => {
   socketIo.off(eventNameSensor)
 })
 </script>
+
+<style scoped lang="css">
+/* generate css animation keyframe blink single bg color */
+@keyframes blink {
+  0% {
+    background-color: #ef4444;
+  }
+  50% {
+    background-color: transparent;
+  }
+  100% {
+    background-color: #ef4444;
+  }
+}
+
+.highlight-sensor {
+  animation: blink 1s ease-in-out infinite;
+}
+</style>

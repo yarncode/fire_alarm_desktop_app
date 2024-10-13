@@ -56,6 +56,12 @@ const listMenu: Array<MenuItemCustom> = [
     icon: 'fi fi-rr-user'
   },
   {
+    label: 'Setting',
+    type: 'route',
+    nameRoute: 'Settings',
+    icon: 'fi fi-rr-it'
+  },
+  {
     label: 'Logout',
     type: 'action',
     icon: 'fi fi-ts-arrow-left-from-arc',
