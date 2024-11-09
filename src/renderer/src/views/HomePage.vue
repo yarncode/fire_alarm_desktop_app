@@ -1,7 +1,20 @@
 <template>
   <div class="h-full">
+    <p class="text-2xl mb-5">List gateway</p>
     <n-grid :x-gap="12" :y-gap="8" cols="400:1 800:2 1500:3 1800:4 2100:5">
-      <n-grid-item v-for="device in devices.value" :key="device.mac">
+      <n-grid-item
+        v-for="device in devices.value.filter((device) => device.type === 'GATEWAY')"
+        :key="device.mac"
+      >
+        <c-gateway :device="device" />
+      </n-grid-item>
+    </n-grid>
+    <p class="text-2xl my-5">List node</p>
+    <n-grid :x-gap="12" :y-gap="8" cols="400:1 800:2 1500:3 1800:4 2100:5">
+      <n-grid-item
+        v-for="device in devices.value.filter((device) => device.type === 'NODE')"
+        :key="device.mac"
+      >
         <c-device :device="device" />
       </n-grid-item>
     </n-grid>
@@ -18,6 +31,7 @@ import { NGrid, NGridItem } from 'naive-ui'
 
 /* import custom component */
 import CDevice from '../components/Device.vue'
+import CGateway from '../components/Gateway.vue'
 
 interface ListDeviceInfo extends DeviceResponse {
   info: InfoDevice[]

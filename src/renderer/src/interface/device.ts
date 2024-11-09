@@ -18,6 +18,7 @@ export type DeviceCode =
   | '107012'
   | '107013'
   | '107014'
+  | '107017'
 export const DEVICE_MESSAGE: { [key in DeviceCode]: string } = {
   '107000': 'None',
   '107001': 'Device not found',
@@ -33,7 +34,8 @@ export const DEVICE_MESSAGE: { [key in DeviceCode]: string } = {
   '107011': 'Device get successfully',
   '107012': 'Device update successfully',
   '107013': 'Device remove successfully',
-  '107014': 'Device not owned by user'
+  '107014': 'Device not owned by user',
+  '107017': 'Setting saved successfully'
 }
 
 export type NodeType = 'GATEWAY' | 'NODE' | 'UNKNOWN'

@@ -3,13 +3,13 @@
     <n-tab-pane name="data-log" tab="Monitor">
       <n-card :title="props.device.name" size="small">
         <template #header-extra>
-          <lottie-player
+          <!-- <lottie-player
             class="w-8"
             :animation-data="
               _device.value.status === 'OFFLINE' ? _urlWiFiOfflineIcon : _urlWiFiOnlineIcon
             "
           >
-          </lottie-player>
+          </lottie-player> -->
         </template>
         <div class="relative">
           <div class="flex">
@@ -88,6 +88,9 @@
           </div>
         </div>
       </n-card>
+    </n-tab-pane>
+    <n-tab-pane name="control-remote" tab="Control">
+      <c-control :device="{ id: props.device.id, name: props.device.name }" />
     </n-tab-pane>
     <n-tab-pane name="settings" tab="Setting">
       <n-card title="Options" size="small">
@@ -188,8 +191,9 @@
 </template>
 
 <script setup lang="ts">
-import { InfoDevice, NodeStateType } from '../interface/device'
+import { DeviceResponse, InfoDevice, NodeStateType } from '../interface/device'
 import { InfoSensor, SocketPayloadSensor, SensorInfoSummary } from '../interface/sensor'
+import CControl from '@renderer/components/Control.vue'
 import {
   NRadio,
   NCard,
@@ -201,7 +205,8 @@ import {
   NSlider,
   NInput,
   NButton,
-  NElement
+  NElement,
+  useMessage
 } from 'naive-ui'
 import { onUnmounted, reactive, ref, getCurrentInstance } from 'vue'
 import { useSocketStore } from '../store/socket'
@@ -217,16 +222,32 @@ import { storeToRefs } from 'pinia'
 Chart.register(...registerables)
 
 /* local icon */
-import _urlWiFiOnlineIcon from '../assets/icon/lottie/wifi-online.json'
-import _urlWiFiOfflineIcon from '../assets/icon/lottie/wifi-offline.json'
+// import _urlWiFiOnlineIcon from '../assets/icon/lottie/wifi-online.json'
+// import _urlWiFiOfflineIcon from '../assets/icon/lottie/wifi-offline.json'
 import _urlSmokeIcon from '../assets/icon/lottie/smoke.json'
 import _urlTemperatureIcon from '../assets/icon/lottie/temperature.json'
 import _urlBlinkNotifyIcon from '../assets/icon/lottie/blink_notify.json'
+
+interface SensorThreshold {
+  start: number
+  end: number
+}
+
+interface DeviceSetting {
+  name: string
+  desc: string
+  threshold: {
+    temperature: SensorThreshold
+    humidity: SensorThreshold
+    smoke: SensorThreshold
+  }
+}
 
 /* get globalProperties */
 const axios = getCurrentInstance()?.appContext.config.globalProperties.$axios
 
 /* socket store */
+const messager = useMessage()
 const { socketIo } = useSocketStore()
 const { id: userId } = useProfileStore()
 const _audio = useAudioStore()
@@ -239,6 +260,7 @@ const props = defineProps<{
 }>()
 const eventNameStatus = `${userId}/${props.device.id}/status`
 const eventNameSensor = `${userId}/${props.device.id}/sensor`
+// const eventDeviceSyncThreshold = `device/${props.device.id}/setting`
 
 const rules = {
   // email: {
@@ -345,7 +367,38 @@ const handleCheckShowModal = () => {
   _settingStore.setHideWarning(!_setting.device.value.hideWarning)
 }
 
-const submitForm = () => {}
+const submitForm = () => {
+  axios
+    ?.post(`/device/setting?id=${_device.value.id}`, {
+      name: formValue.name,
+      desc: formValue.desc,
+      threshold: {
+        temperature: {
+          start: formValue.rangeNotify.temperature[0],
+          end: formValue.rangeNotify.temperature[1]
+        },
+        humidity: {
+          start: formValue.rangeNotify.humidity[0],
+          end: formValue.rangeNotify.humidity[1]
+        },
+        smoke: {
+          start: formValue.rangeNotify.smoke[0],
+          end: formValue.rangeNotify.smoke[1]
+        }
+      }
+    } as DeviceSetting)
+    .then((res) => {
+      const _data = res.data as DeviceResponse
+      if (_data.code === '107017') {
+        messager.success(`Information of device "${_device.value.name}" is saved.`)
+      }
+    })
+    .catch((error) => {
+      if (error instanceof AxiosError) {
+        console.log(error.message)
+      }
+    })
+}
 
 if (axios) {
   axios

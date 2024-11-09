@@ -1,7 +1,7 @@
 <template>
   <n-config-provider :theme="themeConst[themeMode]">
     <n-dialog-provider>
-      <n-message-provider>
+      <n-message-provider placement="bottom-right">
         <slot> </slot>
       </n-message-provider>
     </n-dialog-provider>
