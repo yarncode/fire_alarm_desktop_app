@@ -191,7 +191,13 @@
 </template>
 
 <script setup lang="ts">
-import { DeviceResponse, InfoDevice, NodeStateType } from '../interface/device'
+import {
+  DeviceResponse,
+  InfoDevice,
+  NodeStateType,
+  NotifyPayload,
+  DeviceSettingResponse
+} from '../interface/device'
 import { InfoSensor, SocketPayloadSensor, SensorInfoSummary } from '../interface/sensor'
 import CControl from '@renderer/components/Control.vue'
 import {
@@ -208,7 +214,7 @@ import {
   NElement,
   useMessage
 } from 'naive-ui'
-import { onUnmounted, reactive, ref, getCurrentInstance } from 'vue'
+import { onUnmounted, reactive, ref, getCurrentInstance, h } from 'vue'
 import { useSocketStore } from '../store/socket'
 import { useProfileStore } from '../store/profile'
 import { useSettingStore } from '../store/setting'
@@ -260,6 +266,7 @@ const props = defineProps<{
 }>()
 const eventNameStatus = `${userId}/${props.device.id}/status`
 const eventNameSensor = `${userId}/${props.device.id}/sensor`
+const eventNameSyncThreshold = `${userId}/${props.device.id}/sync_threshold`
 // const eventDeviceSyncThreshold = `device/${props.device.id}/setting`
 
 const rules = {
@@ -401,6 +408,7 @@ const submitForm = () => {
 }
 
 if (axios) {
+  /* get sensor info */
   axios
     .get(`/sensor/info/${_device.value.id}?time=${300}`)
     .then((response) => {
@@ -439,11 +447,45 @@ if (axios) {
         console.log(error.message)
       }
     })
+
+  /* get device setting */
+  axios
+    .get(`/device/setting?id=${_device.value.id}`)
+    .then((res) => {
+      const { info }: { info: DeviceSettingResponse } = res.data
+
+      console.log(info);
+
+      formValue.rangeNotify.temperature[0] = info.threshold.temperature.start
+      formValue.rangeNotify.temperature[1] = info.threshold.temperature.end
+      formValue.rangeNotify.humidity[0] = info.threshold.humidity.start
+      formValue.rangeNotify.humidity[1] = info.threshold.humidity.end
+      formValue.rangeNotify.smoke[0] = info.threshold.smoke.start
+      formValue.rangeNotify.smoke[1] = info.threshold.smoke.end
+    })
+    .catch((error) => {
+      if (error instanceof AxiosError) {
+        console.log(error.message)
+      }
+    })
 }
 
 socketIo.on(eventNameStatus, (payload: { status: NodeStateType }) => {
   console.log('status: ', socketIo.id, payload)
   _device.value.status = payload.status
+})
+
+socketIo.on(eventNameSyncThreshold, (payload: NotifyPayload) => {
+  console.log('payload: ', payload)
+
+  if (payload._type === 'SYNC_THRESHOLD') {
+    messager.success(() =>
+      h('div', [
+        h('p', `Device ${_device.value.name} - ${_device.value.mac}`),
+        h('p', `Sync threshold successfully.`)
+      ])
+    )
+  }
 })
 
 socketIo.on(eventNameSensor, (payload: SocketPayloadSensor) => {
@@ -523,6 +565,7 @@ socketIo.on(eventNameSensor, (payload: SocketPayloadSensor) => {
 onUnmounted(() => {
   socketIo.off(eventNameStatus)
   socketIo.off(eventNameSensor)
+  socketIo.off(eventNameSyncThreshold)
 })
 </script>
 

@@ -59,3 +59,28 @@ export interface InfoDevice {
   mac: string
   id: string
 }
+
+export interface NotifyPayload {
+  timestamp: number
+  _type: string
+  smoke: number[]
+  temp: number[]
+  humi: number[]
+}
+
+export interface DeviceSettingResponse {
+  threshold: {
+    temperature: {
+      start: number
+      end: number
+    }
+    humidity: {
+      start: number
+      end: number
+    }
+    smoke: {
+      start: number
+      end: number
+    }
+  }
+}
