@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import instanceSocket from '../socket'
-import { Socket } from 'socket.io-client'
+import { Socket, io } from 'socket.io-client'
+import { useAuthStore } from '@renderer/store/auth'
 
 interface AckSwitch {
   [key: number]: {
@@ -10,24 +10,39 @@ interface AckSwitch {
   }
 }
 
+export type eventSocket = 'connect' | 'disconnect'
+
+export type EventSocketHandler = {
+  [key in eventSocket]: ((socket: Socket) => void)[]
+}
+
 export const useSocketStore = defineStore('socket-io', {
-  state: () =>
-    ({
-      _socketIo: instanceSocket,
-      firstInit: true,
-      _ackWait: {},
-      idItervalAck: undefined
-    }) as {
-      _socketIo: Socket
-      firstInit: boolean
-      _ackWait: AckSwitch
-      idItervalAck: number | undefined
-    },
+  state: (): {
+    _socket: Socket
+    _ackWait: AckSwitch
+    _event: EventSocketHandler
+    firstInit: boolean
+    idIntervalAck: number | undefined
+    token: string
+  } => ({
+    _socket: io(`ws://localhost:3000`, {
+      autoConnect: false,
+      auth: (cb) => {
+        const { runtimeToken } = useAuthStore()
+        cb({ token: runtimeToken })
+      }
+    }),
+    _ackWait: {},
+    _event: { connect: [], disconnect: [] },
+    firstInit: true,
+    idIntervalAck: undefined,
+    token: ''
+  }),
   actions: {
     removeAckWait(key: number) {
       delete this._ackWait[key]
 
-      if (this.idItervalAck && Object.keys(this._ackWait).length === 0) {
+      if (this.idIntervalAck && Object.keys(this._ackWait).length === 0) {
         /* remove time Interval */
         this.removeAckInterval()
       }
@@ -40,7 +55,7 @@ export const useSocketStore = defineStore('socket-io', {
     ) {
       this._ackWait[key] = { pos: value, state: pastState, cb }
 
-      if (this.idItervalAck === undefined && Object.keys(this._ackWait).length > 0) {
+      if (this.idIntervalAck === undefined && Object.keys(this._ackWait).length > 0) {
         /* add time Interval */
         this.createAckInterval()
       }
@@ -51,7 +66,7 @@ export const useSocketStore = defineStore('socket-io', {
     createAckInterval() {
       console.log('create ack interval')
 
-      this.idItervalAck = setInterval(() => {
+      this.idIntervalAck = setInterval(() => {
         /* check ack is outdate */
         const now = Date.now()
 
@@ -68,33 +83,57 @@ export const useSocketStore = defineStore('socket-io', {
       }, 2000) as unknown as number
     },
     removeAckInterval() {
-      if (this.idItervalAck) {
+      if (this.idIntervalAck) {
         console.log('remove ack interval')
 
-        clearInterval(this.idItervalAck)
-        this.idItervalAck = undefined
+        clearInterval(this.idIntervalAck)
+        this.idIntervalAck = undefined
       }
     },
     setAuth(token: string) {
-      if (this.firstInit) {
-        this._socketIo.on('connect', this._onConnected)
-        this._socketIo.on('disconnect', this._onDisconnected)
-        this.firstInit = false
+      this.token = token
+    },
+    addListener(event: eventSocket, cb: (socket: Socket) => void) {
+      this._event[event].push(cb)
+    },
+    removeListener(event: eventSocket, cb: (socket: Socket) => void) {
+      this._event[event] = this._event[event].filter((item) => item !== cb)
+    },
+    removeAllListener() {
+      this._event = { connect: [], disconnect: [] }
+    },
+    setupSocket(hostName: string, port: number) {
+      /* disconnect if connected */
+      if (this._socket.connected) {
+        /* remove event */
+        this._socket.off('connect')
+        this._socket.off('disconnect')
+        this._socket.disconnect()
       }
 
-      if (this._socketIo.connected === false) {
-        this._socketIo.auth = { token }
-        this._socketIo.connect()
-      }
+      /* create new socket */
+      const _sock = io(`ws://${hostName}:${port}`, {
+        autoConnect: false,
+        auth: (cb) => {
+          const { runtimeToken } = useAuthStore()
+          cb({ token: runtimeToken })
+        }
+      })
+        .on('connect', () => {
+          this._event.connect.forEach((cb) => cb(_sock))
+        })
+        .on('disconnect', () => {
+          this._event.disconnect.forEach((cb) => cb(_sock))
+        })
+
+      /* set socket into store */
+      this._socket = _sock
     },
-    _onConnected() {
-      console.log('socket connected: ', this._socketIo.id)
-    },
-    _onDisconnected() {
-      console.log('socket disconnected: ', this._socketIo.id)
+    connect() {
+      this._socket.connect()
     }
   },
   getters: {
-    socketIo: (state) => state._socketIo
+    socketIo: (state) => state._socket
   }
 })

@@ -1,170 +1,143 @@
 import { defineStore } from 'pinia'
 import { jwtDecode, JwtPayload } from 'jwt-decode'
 import { AccountResponse } from '../interface/account'
-import { useProfileStore } from './profile'
-import { useSocketStore } from './socket'
+// import { useProfileStore } from './profile'
 import api from '../api'
 
 export interface ResponseRefreshToken extends AccountResponse {
   runtime_token?: string
 }
+
+export interface ResRuntimeToken extends AccountResponse {
+  runtime_token: string
+}
+
 interface PayloadDecodeRuntimeToken extends JwtPayload {
   email: string
 }
+
+interface PayloadTokenUser extends JwtPayload {
+  email: string
+}
+
+interface CustomExpire {
+  exp: number
+  state: boolean
+}
+
 export type TokenType = 'runtime_token' | 'refresh_token'
 
 export const useAuthStore = defineStore('auth', {
   state: (): {
     runtime_token: string
     refresh_token: string
-    id_interval: number
+    loopTokenRefresh: boolean
+    idTimeout: number
   } => ({
     runtime_token: localStorage.getItem('runtime_token') || '',
     refresh_token: localStorage.getItem('refresh_token') || '',
-    id_interval: 0
+    loopTokenRefresh: false,
+    idTimeout: 0
   }),
   actions: {
     setToken(type: TokenType, token: string) {
-      console.log('set token: ', type)
-
       this[type] = token
       localStorage.setItem(type, token)
     },
-    addAuthSocketIo(token: string) {
-      const socketStore = useSocketStore()
-
-      /* start client socket connection */
-      if (socketStore.socketIo.connected === false) {
-        /* set auth */
-        socketStore.setAuth(token)
-      }
-    },
-    clearToken(type: TokenType) {
+    cleanToken(type: TokenType) {
       this[type] = ''
       localStorage.removeItem(type)
     },
-    clearAllToken() {
-      this.clearToken('runtime_token')
-      this.clearToken('refresh_token')
+    clearAllToken(): void {
+      this.cleanToken('runtime_token')
+      this.cleanToken('refresh_token')
+    },
+    isAuth() {
+      return this.runtime_token.length > 0 && this.refresh_token.length > 0
+    },
+    isTokenExpired(type: TokenType, timeDelay: number = 20): CustomExpire {
+      /* get payload by token */
+      const _payload: PayloadTokenUser = jwtDecode(this[type])
+      const _expire = (_payload?.exp ?? 0) - Date.now() / 1000
+      /* check status token */
+      return _expire < timeDelay
+        ? {
+            exp: _expire - 20,
+            state: true
+          }
+        : {
+            exp: _expire - 20,
+            state: false
+          }
+    },
+    async getRefreshToken(): Promise<string | undefined> {
+      try {
+        /* get payload contain email */
+        const _payload: PayloadTokenUser = jwtDecode(this.refresh_token)
+        /* get response server */
+        const response = await api.post(
+          '/account/refresh-token',
+          {
+            email: _payload.email
+          },
+          {
+            headers: {
+              _token: this.refresh_token
+            }
+          }
+        )
+        const _data: ResRuntimeToken = response.data
+
+        if (_data.code === '108011') {
+          return _data.runtime_token
+        }
+      } catch (error) {}
+      return undefined
+    },
+    async gotoRefreshToken(): Promise<void> {
+      const _isExpire = this.isTokenExpired('runtime_token')
+
+      if (_isExpire.state) {
+        console.log('_token is expire. goto refresh token...')
+
+        /* call api refresh token */
+        const _token = await this.getRefreshToken()
+        if (_token) {
+          this.setToken('runtime_token', _token)
+        }
+      }
+
+      /* parse token */
+      const _payload: PayloadDecodeRuntimeToken = jwtDecode(this.runtime_token)
+      const _dateNow = Date.now() / 1000
+      const _nextTime = Math.ceil((_payload?.exp ?? 0) - _dateNow - 20)
+
+      console.log('Next time refresh token: ', _nextTime)
+
+      if (_nextTime > 0) {
+        this.loopTokenRefresh = false // unlock
+        this.gotoRefreshTokenWithTime(this.gotoRefreshToken, _nextTime * 1000)
+      }
+    },
+    async gotoRefreshTokenWithTime(cb: () => Promise<void>, time: number): Promise<void> {
+      if (this.loopTokenRefresh === false) {
+        this.idTimeout = setTimeout(async () => {
+          await cb()
+        }, time) as unknown as number
+        /* lock setTimeout */
+        this.loopTokenRefresh = true
+      }
     },
     logout() {
+      /* stop loop token */
+      this.stopLoopTokenRefresh()
+      /* clean token */
       this.clearAllToken()
-      if (this.id_interval) {
-        clearInterval(this.id_interval)
-        this.id_interval = 0
-      }
     },
-    runCheckRefreshToken() {
-      let getNew = false
-      const profileStore = useProfileStore()
-
-      if (!this.refresh_token) {
-        return
-      }
-
-      if (!this.runtime_token) {
-        getNew = true
-      }
-
-      const decode: PayloadDecodeRuntimeToken = jwtDecode(this.runtime_token)
-
-      /* if token exp time is less than 20 seconds => goto refresh */
-      if ((decode?.exp ?? 0) - Date.now() / 1000 < 20) {
-        getNew = true
-      } else {
-        /* token not expire */
-        this.calculateIntervalRefreshToken()
-        /* add auth socket */
-        this.addAuthSocketIo(this.runtimeToken)
-        /* get profile user */
-        profileStore.getProfile()
-        return
-      }
-
-      if (getNew) {
-        console.log('goto refresh token')
-        this.runRefreshToken(decode.email)
-      }
-    },
-    async runRefreshToken(email: string) {
-      const profileStore = useProfileStore()
-
-      return new Promise((resolve, reject) => {
-        if (!this.refresh_token) {
-          reject()
-        }
-        api
-          .post(
-            '/account/refresh-token',
-            {
-              email
-            },
-            {
-              headers: {
-                _token: this.refresh_token
-              }
-            }
-          )
-          .then((response) => {
-            const data: ResponseRefreshToken = response.data
-            if (data.code === '108011') {
-              console.log('token is refresh')
-
-              this.setToken('runtime_token', data.runtime_token ?? '')
-              /* restart calculate time to refresh */
-              this.calculateIntervalRefreshToken()
-              /* add auth socket */
-              this.addAuthSocketIo(this.runtimeToken)
-              /* get profile user */
-              profileStore.getProfile()
-
-              resolve(data.runtime_token ?? '')
-            }
-            reject(data.message)
-          })
-          .catch((error) => {
-            console.log(error)
-            reject(error)
-          })
-      })
-    },
-    calculateIntervalRefreshToken() {
-      if (!this.refresh_token) {
-        return
-      }
-
-      if (this.id_interval) {
-        return
-      }
-
-      const decode: PayloadDecodeRuntimeToken = jwtDecode(this.runtime_token)
-
-      console.log('token expire after: ', (decode?.exp ?? 0) - Date.now() / 1000)
-      const interval = (decode?.exp ?? 0) - Date.now() / 1000 - 20
-      this.id_interval = setInterval(() => {
-        this.runRefreshToken(decode.email)
-      }, interval * 1000) as unknown as number
-      console.log('get token after: ', interval)
-    },
-    stopIntervalRefreshToken() {
-      console.log('stop interval refresh token')
-      if (this.id_interval) {
-        clearInterval(this.id_interval)
-        this.id_interval = 0
-      }
-    },
-    async forceRefreshToken() {
-      if (!this.refresh_token) {
-        return
-      }
-
-      const decode: PayloadDecodeRuntimeToken = jwtDecode(this.runtime_token)
-
-      /* if time is less than 60 seconds => goto refresh */
-      if ((decode?.exp ?? 0) - Date.now() / 1000 < 60) {
-        console.log('token time less than 60s')
-        this.stopIntervalRefreshToken()
-        await this.runRefreshToken(decode.email)
+    stopLoopTokenRefresh() {
+      if (this.idTimeout) {
+        clearTimeout(this.idTimeout)
+        this.loopTokenRefresh = false
       }
     }
   },
