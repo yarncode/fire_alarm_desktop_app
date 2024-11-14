@@ -112,11 +112,14 @@ export const useAuthStore = defineStore('auth', {
       const _dateNow = Date.now() / 1000
       const _nextTime = Math.ceil((_payload?.exp ?? 0) - _dateNow - 20)
 
-      console.log('Next time refresh token: ', _nextTime)
-
+      this.loopTokenRefresh = false // unlock
       if (_nextTime > 0) {
-        this.loopTokenRefresh = false // unlock
+        console.log('Next time refresh token: ', _nextTime)
         this.gotoRefreshTokenWithTime(this.gotoRefreshToken, _nextTime * 1000)
+      } else {
+        const _time = 5
+        console.log('Next time refresh token: ', _time)
+        this.gotoRefreshTokenWithTime(this.gotoRefreshToken, _time * 1000)
       }
     },
     async gotoRefreshTokenWithTime(cb: () => Promise<void>, time: number): Promise<void> {
@@ -126,6 +129,25 @@ export const useAuthStore = defineStore('auth', {
         }, time) as unknown as number
         /* lock setTimeout */
         this.loopTokenRefresh = true
+      }
+    },
+    async activeRunnerCheckToken(): Promise<void> {
+      if (this.hasRunnerCheckToken()) {
+        return
+      }
+
+      /* dispatch check token */
+      const _expire = this.isTokenExpired('runtime_token')
+
+      /* if token is expire */
+      if (_expire.state) {
+        await this.gotoRefreshToken()
+        /* if token is not expire */
+      } else {
+        const _expireNum = Math.ceil(_expire.exp)
+        console.log('_token expire: ', _expireNum)
+        /* goto refresh token after range time */
+        this.gotoRefreshTokenWithTime(this.gotoRefreshToken, _expireNum * 1000)
       }
     },
     logout() {
@@ -139,6 +161,9 @@ export const useAuthStore = defineStore('auth', {
         clearTimeout(this.idTimeout)
         this.loopTokenRefresh = false
       }
+    },
+    hasRunnerCheckToken(): boolean {
+      return this.loopTokenRefresh
     }
   },
   getters: {

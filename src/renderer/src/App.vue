@@ -6,7 +6,7 @@
       </n-layout-sider>
       <n-layout>
         <n-layout-content class="h-full px-10 py-5">
-          <div v-if="$route.name !== 'Account'" class="flex items-center my-2">
+          <div v-if="$route.name !== 'Account'" class="flex items-center mb-5">
             <p class="text-md">Server status:</p>
             <p
               class="ml-2 px-2 rounded-md shadow"
@@ -19,6 +19,7 @@
               {{ socketIo.connected ? 'connected' : 'disconnected' }}
             </p>
           </div>
+          <setting-float-button v-if="$route.name === 'Account'" />
           <router-view v-slot="{ Component, route }">
             <transition name="fade" mode="out-in">
               <component :is="Component" :key="route.path" />
@@ -26,7 +27,6 @@
           </router-view>
         </n-layout-content>
       </n-layout>
-      <setting-float-button v-if="$route.name === 'Account'" />
     </n-layout>
   </wrap-provider>
 </template>

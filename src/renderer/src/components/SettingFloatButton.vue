@@ -16,13 +16,11 @@
     </n-float-button>
     <n-modal
       v-model:show="showModal"
-      class="mx-10 w-1/2"
+      class="mx-auto w-1/3"
       preset="card"
-      transform-origin="center"
       role="dialog"
-      title="Information Host"
-      size="small"
-      aria-modal="true"
+      title="Information Server"
+      size="huge"
     >
       <n-space vertical class="mt-2">
         <n-input v-model:value="serverSetting.hostName" round type="text" placeholder="domain" />
@@ -59,27 +57,39 @@ import {
 import { SettingsOutline } from '@vicons/ionicons5'
 import { ref, reactive } from 'vue'
 import { useSettingStore, SettingServer } from '@renderer/store/setting'
+import { storeToRefs } from 'pinia'
 
 const message = useMessage()
-const { server } = useSettingStore()
+const { server } = storeToRefs(useSettingStore())
+const { saveServerSetting } = useSettingStore()
 
 const serverSetting: SettingServer = reactive({
-  hostName: server.hostName,
-  apiVersion: server.apiVersion,
-  entryPath: server.entryPath,
-  portApi: server.portApi,
-  portSocket: server.portSocket
+  hostName: server.value.hostName,
+  apiVersion: server.value.apiVersion,
+  entryPath: server.value.entryPath,
+  portApi: server.value.portApi,
+  portSocket: server.value.portSocket
 })
-
-console.log(serverSetting)
 
 const showModal = ref(false)
 
 const openSetting = () => {
+  /* reload data from store setting */
+  serverSetting.hostName = server.value.hostName
+  serverSetting.apiVersion = server.value.apiVersion
+  serverSetting.entryPath = server.value.entryPath
+  serverSetting.portApi = server.value.portApi
+  serverSetting.portSocket = server.value.portSocket
+
   showModal.value = true
 }
 
-const saveSetting = () => {}
+const saveSetting = () => {
+  /* save server setting */
+  saveServerSetting(serverSetting)
+  /* notify save success */
+  message.success('Server information is saved.')
+}
 </script>
 
 <style scoped></style>

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '../store/auth'
 import { useSocketStore } from '../store/socket'
+import { useSettingStore } from '../store/setting'
 // import { useDialog } from 'naive-ui'
 
 const routes: Array<RouteRecordRaw> = [
@@ -33,8 +34,9 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, _, next) => {
-  const { isAuth, gotoRefreshToken, isTokenExpired, gotoRefreshTokenWithTime } = useAuthStore()
+  const { isAuth, activeRunnerCheckToken } = useAuthStore()
   const { socketIo, setupSocket, connect } = useSocketStore()
+  const { server } = useSettingStore()
 
   /* check is auth */
   let _isAuth = true
@@ -47,25 +49,15 @@ router.beforeEach(async (to, _, next) => {
   if (to.name !== 'Account' && _isAuth === false) {
     next({ name: 'Account' })
   } else if (_isAuth) {
-    /* dispatch check token */
-    const _expire = isTokenExpired('runtime_token')
-
-    /* if token is expire */
-    if (_expire.state) {
-      await gotoRefreshToken()
-      /* if token is not expire */
-    } else {
-      const _expireNum = Math.ceil(_expire.exp)
-      console.log('_token expire: ', _expireNum)
-      /* goto refresh token after range time */
-      gotoRefreshTokenWithTime(gotoRefreshToken, _expireNum * 1000)
-    }
-
-    /* start socket client */
-    if (socketIo.disconnected) {
-      setupSocket(import.meta.env.VITE_HOST_NAME, import.meta.env.VITE_HOST_SOCKET_PORT)
-      connect()
-    }
+    activeRunnerCheckToken()
+      .then(() => {
+        /* start socket client */
+        if (socketIo.disconnected) {
+          setupSocket(server.hostName, server.portSocket)
+          connect()
+        }
+      })
+      .catch(() => {})
 
     /* redirect to home if user attempt to login */
     if (to.name === 'Account') {

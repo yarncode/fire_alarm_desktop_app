@@ -33,7 +33,7 @@
           <p class="font-bold mr-2">Switch all</p>
           <n-switch
             v-model:value="ioOutAll.value"
-            :disabled="ioOutAll.locker && switchLocker"
+            :disabled="ioOutAll.locker || switchLocker"
             @update-value="(_newState) => changeStateAllSwitch(_newState)"
           />
         </div>
@@ -54,7 +54,7 @@
           <p class="mb-2">{{ `Swicth ${index + 1}` }}</p>
           <n-switch
             v-model:value="output.value"
-            :disabled="output.locker && switchLocker"
+            :disabled="output.locker || switchLocker"
             @update-value="(_newState) => changeState(index, _newState)"
           />
         </div>
