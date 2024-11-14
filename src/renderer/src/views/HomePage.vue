@@ -47,7 +47,6 @@ interface ListDeviceInfo extends DeviceResponse {
 
 /* get globalProperties */
 const axios = getCurrentInstance()?.appContext.config.globalProperties.$axios
-
 const devices = reactive<{ value: InfoDevice[] }>({ value: [] })
 
 if (axios) {

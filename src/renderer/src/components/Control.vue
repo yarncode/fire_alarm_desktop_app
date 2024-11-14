@@ -33,7 +33,7 @@
           <p class="font-bold mr-2">Switch all</p>
           <n-switch
             v-model:value="ioOutAll.value"
-            :disabled="ioOutAll.locker"
+            :disabled="ioOutAll.locker && switchLocker"
             @update-value="(_newState) => changeStateAllSwitch(_newState)"
           />
         </div>
@@ -54,7 +54,7 @@
           <p class="mb-2">{{ `Swicth ${index + 1}` }}</p>
           <n-switch
             v-model:value="output.value"
-            :disabled="output.locker"
+            :disabled="output.locker && switchLocker"
             @update-value="(_newState) => changeState(index, _newState)"
           />
         </div>
@@ -65,8 +65,9 @@
 
 <script setup lang="ts">
 import { NCard, NResult, NTooltip, NSwitch } from 'naive-ui'
-import { onUnmounted, reactive } from 'vue'
+import { onUnmounted, reactive, watchEffect, ref } from 'vue'
 
+import { storeToRefs } from 'pinia'
 import { useSocketStore } from '@renderer/store/socket'
 import { DeviceResponse } from '@renderer/interface/device'
 import api from '@renderer/api'
@@ -117,7 +118,8 @@ const props = defineProps<{
   device: PropsDevice
 }>()
 
-const { socketIo, getAckWait, setAckWait, removeAckWait } = useSocketStore()
+const { socketIo } = storeToRefs(useSocketStore())
+const { getAckWait, setAckWait, removeAckWait } = useSocketStore()
 const ioOutAll = reactive<{
   locker: boolean
   value: boolean
@@ -128,6 +130,15 @@ const ioOutAll = reactive<{
 const ioDevice = reactive<IoData>({
   input: [],
   output: []
+})
+const switchLocker = ref<boolean>(false)
+
+const unWatch = watchEffect(() => {
+  if (socketIo.value.connected) {
+    switchLocker.value = false
+  } else {
+    switchLocker.value = true
+  }
 })
 
 const checkSwitchAll = () => {
@@ -147,7 +158,7 @@ const changeAllSwitchState = () => {
 const changeStateAllSwitch = (state: boolean) => {
   console.log('change all switch: ', state)
 
-  if (socketIo.connected) {
+  if (socketIo.value.connected) {
     const _ack = Date.now()
     const _io: PayloadIo = {
       deviceId: props.device.id,
@@ -165,7 +176,7 @@ const changeStateAllSwitch = (state: boolean) => {
       ioOutAll.value = state
     })
     /* send control via socketIo */
-    socketIo.emit('control_io', _io)
+    socketIo.value.emit('control_io', _io)
   }
 }
 
@@ -173,7 +184,7 @@ const changeState = (pos: number, state: boolean) => {
   console.log('change switch: ', pos, 'new state: ', state)
   /* send control via socketIo */
 
-  if (socketIo.connected && ioDevice.output[pos].locker === false) {
+  if (socketIo.value.connected && ioDevice.output[pos].locker === false) {
     const _ack = Date.now()
     const _io: PayloadIo = {
       deviceId: props.device.id,
@@ -192,15 +203,15 @@ const changeState = (pos: number, state: boolean) => {
     })
 
     /* send control via socketIo */
-    socketIo.emit('control_io', _io)
+    socketIo.value.emit('control_io', _io)
   }
 }
 
-socketIo.on(`device/${props.device.id}/input-io`, (data) => {
+socketIo.value.on(`device/${props.device.id}/input-io`, (data) => {
   console.log('data: ', data)
 })
 
-socketIo.on(`device/${props.device.id}/output-io`, (data: PayloadIo) => {
+socketIo.value.on(`device/${props.device.id}/output-io`, (data: PayloadIo) => {
   console.log('data: ', data)
   if (data && data.data._ack) {
     const _ack = data.data._ack
@@ -228,6 +239,9 @@ api
     if (_data.code === '107002') {
       ioDevice.input = _data.info.input.map((item) => ({ ...item, locker: false }))
       ioDevice.output = _data.info.output.map((item) => ({ ...item, locker: false }))
+
+      /* check all switch */
+      checkSwitchAll()
     }
   })
   .catch((error) => {
@@ -235,10 +249,12 @@ api
   })
 
 onUnmounted(() => {
-  socketIo.off(`device/${props.device.id}/input-io`)
-  socketIo.off(`device/${props.device.id}/output-io`)
-})
+  socketIo.value.off(`device/${props.device.id}/input-io`)
+  socketIo.value.off(`device/${props.device.id}/output-io`)
 
+  /* clean watcher */
+  unWatch()
+})
 </script>
 
 <style scoped></style>

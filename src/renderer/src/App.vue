@@ -6,9 +6,19 @@
       </n-layout-sider>
       <n-layout>
         <n-layout-content class="h-full px-10 py-5">
-          <!-- main content -->
-          <!-- <n-button @click="test">Test 1</n-button>
-          <n-button @click="test2">Test 2</n-button> -->
+          <div v-if="$route.name !== 'Account'" class="flex items-center my-2">
+            <p class="text-md">Server status:</p>
+            <p
+              class="ml-2 px-2 rounded-md shadow"
+              :class="
+                socketIo.connected
+                  ? 'bg-green-500 shadow-green-500'
+                  : 'bg-slate-500 shadow-slate-500'
+              "
+            >
+              {{ socketIo.connected ? 'connected' : 'disconnected' }}
+            </p>
+          </div>
           <router-view v-slot="{ Component, route }">
             <transition name="fade" mode="out-in">
               <component :is="Component" :key="route.path" />
@@ -16,47 +26,23 @@
           </router-view>
         </n-layout-content>
       </n-layout>
+      <setting-float-button v-if="$route.name === 'Account'" />
     </n-layout>
   </wrap-provider>
 </template>
 
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
-import { NLayout, NLayoutSider, NLayoutContent, NButton } from 'naive-ui'
+import { NLayout, NLayoutSider, NLayoutContent } from 'naive-ui'
 
 import WrapProvider from './components/WrapProvider.vue'
 import MenuSide from './components/MenuSide.vue'
+import SettingFloatButton from './components/SettingFloatButton.vue'
 
 import { useSocketStore } from '@renderer/store/socket'
+import { storeToRefs } from 'pinia'
 
-import { Socket } from 'socket.io-client'
-import { onUnmounted } from 'vue'
-
-const { connect, setupSocket, addListener, removeListener, socketIo } = useSocketStore()
-
-const onConnected = (socket: Socket) => {
-  console.log('socket connected id: ', socket.id)
-}
-
-const onDisconnected = (socket: Socket) => {
-  console.log('socket disconnected id: ', socket.id)
-}
-
-/* add event */
-addListener('connect', onConnected)
-addListener('disconnect', onDisconnected)
-
-if (socketIo.disconnected) {
-  /* setup socket */
-  setupSocket(import.meta.env.VITE_HOST_NAME, import.meta.env.VITE_HOST_SOCKET_PORT)
-  /* goto connect */
-  connect()
-}
-
-onUnmounted(() => {
-  removeListener('connect', onConnected)
-  removeListener('disconnect', onDisconnected)
-})
+const { socketIo } = storeToRefs(useSocketStore())
 </script>
 
 <style scoped>

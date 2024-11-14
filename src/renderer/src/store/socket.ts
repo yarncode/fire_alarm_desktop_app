@@ -25,7 +25,7 @@ export const useSocketStore = defineStore('socket-io', {
     idIntervalAck: number | undefined
     token: string
   } => ({
-    _socket: io(`ws://localhost:3000`, {
+    _socket: io(`ws://${import.meta.env.VITE_HOST_NAME}:${import.meta.env.VITE_HOST_SOCKET_PORT}`, {
       autoConnect: false,
       auth: (cb) => {
         const { runtimeToken } = useAuthStore()
@@ -46,6 +46,9 @@ export const useSocketStore = defineStore('socket-io', {
         /* remove time Interval */
         this.removeAckInterval()
       }
+    },
+    removeAllAckWait() {
+      this._ackWait = {}
     },
     setAckWait(
       key: number,
@@ -131,6 +134,18 @@ export const useSocketStore = defineStore('socket-io', {
     },
     connect() {
       this._socket.connect()
+    },
+    logout() {
+      /* disconnect to server */
+      if (this.socketIo.connected) {
+        this.socketIo.disconnect()
+      }
+      /* remove all ack waiting */
+      this.removeAllAckWait()
+      /* remove all listener */
+      this.removeAllListener()
+      /* remove ack interval */
+      this.removeAckInterval()
     }
   },
   getters: {

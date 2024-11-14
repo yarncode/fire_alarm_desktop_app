@@ -24,6 +24,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { computed } from 'vue'
 
 import { useAuthStore } from '../store/auth'
+import { useSocketStore } from '../store/socket'
 
 type MenuItemType = 'route' | 'action'
 
@@ -42,6 +43,7 @@ const router = useRouter()
 const route = useRoute()
 const dialog = useDialog()
 const authStore = useAuthStore()
+const _sSocket = useSocketStore()
 const listMenu: Array<MenuItemCustom> = [
   {
     label: 'Home',
@@ -73,7 +75,11 @@ const listMenu: Array<MenuItemCustom> = [
         positiveText: 'Sure',
         negativeText: 'Cancel',
         onPositiveClick: () => {
+          /* logout token session */
           authStore.logout()
+          /* logout socket connection */
+          _sSocket.logout()
+
           router.push({ name: 'Account' })
         },
         onNegativeClick: () => {}
