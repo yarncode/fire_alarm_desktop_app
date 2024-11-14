@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { jwtDecode, JwtPayload } from 'jwt-decode'
 import { AccountResponse } from '../interface/account'
-// import { useProfileStore } from './profile'
+import { useProfileStore } from './profile'
 import api from '../api'
 
 export interface ResponseRefreshToken extends AccountResponse {
@@ -51,6 +51,13 @@ export const useAuthStore = defineStore('auth', {
     clearAllToken(): void {
       this.cleanToken('runtime_token')
       this.cleanToken('refresh_token')
+    },
+    onRuntimeTokenValid(): void {
+      const { isUpdated, getProfile } = useProfileStore()
+
+      if (isUpdated === false) {
+        getProfile()
+      }
     },
     isAuth() {
       return this.runtime_token.length > 0 && this.refresh_token.length > 0
@@ -149,6 +156,8 @@ export const useAuthStore = defineStore('auth', {
         /* goto refresh token after range time */
         this.gotoRefreshTokenWithTime(this.gotoRefreshToken, _expireNum * 1000)
       }
+
+      this.onRuntimeTokenValid()
     },
     logout() {
       /* stop loop token */
