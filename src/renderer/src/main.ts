@@ -5,7 +5,7 @@ import configAxios from './api'
 
 import 'chartjs-adapter-date-fns';
 
-import './assets/tailwindcss/index.css'
+import '@renderer/assets/tailwindcss/index.css'
 import '@flaticon/flaticon-uicons/css/all/all.css'
 
 import { createApp } from 'vue'

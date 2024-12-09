@@ -7,8 +7,7 @@ function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     show: false,
-    fullscreen: true,
-    autoHideMenuBar: true,
+    title: 'Fire Alarm',
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -18,9 +17,9 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
-    mainWindow.webContents.openDevTools({
-      mode: 'bottom'
-    })
+    // mainWindow.webContents.openDevTools({
+    //   mode: 'bottom'
+    // })
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {

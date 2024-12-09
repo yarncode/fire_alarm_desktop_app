@@ -12,9 +12,10 @@ export default defineConfig({
   renderer: {
     resolve: {
       alias: {
-        '@renderer': resolve('src/renderer/src')
+        '@renderer': resolve('src/renderer/src'),
+        'lottie-web': resolve(__dirname, 'node_modules/lottie-web/build/player/lottie_light.js')
       }
     },
-    plugins: [vue()],
+    plugins: [vue()]
   }
 })
