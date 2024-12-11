@@ -3,16 +3,7 @@
     <c-device-status :status="_device.value.status === 'ONLINE' ? true : false" />
     <n-tabs class="" type="segment" animated>
       <n-tab-pane name="data-log" tab="Monitor">
-        <n-card :title="props.device.name" size="small">
-          <template #header-extra>
-            <!-- <lottie-player
-              class="w-8"
-              :animation-data="
-                _device.value.status === 'OFFLINE' ? _urlWiFiOfflineIcon : _urlWiFiOnlineIcon
-              "
-            >
-            </lottie-player> -->
-          </template>
+        <n-card :title="formValue.name" size="small">
           <div class="relative">
             <div class="flex">
               <div class="flex-1">
@@ -66,7 +57,7 @@
                 <div
                   class="px-5 pt-5 border-2 border-red-400 border-b-0 rounded-3xl rounded-b-none"
                 >
-                  <lottie-player class="w-16 h-16" :animation-data="_urlBlinkNotifyIcon" />
+                  <lottie-player class="!w-16 !h-16" :animation-data="_urlBlinkNotifyIcon" />
                   <p class="text-sm py-2 w-full text-slate-400">
                     Warning: {{ warningFirePayload.message }}
                   </p>
@@ -98,10 +89,13 @@
         </n-card>
       </n-tab-pane>
       <n-tab-pane name="control-remote" tab="Control">
-        <c-control :device="{ id: props.device.id, name: props.device.name }" />
+        <c-control :device="{ id: props.device.id, name: formValue.name }" />
       </n-tab-pane>
       <n-tab-pane name="settings" tab="Setting">
         <n-card title="Options" size="small">
+          <template #header-extra>
+            <remove-device :device="{ ...props.device, name: formValue.name }" />
+          </template>
           <n-form
             ref="formRef"
             :label-width="80"
@@ -129,7 +123,7 @@
             <n-form-item path="rangeNotify.smoke">
               <template #label>
                 <div class="flex items-center">
-                  <lottie-player class="w-8" :animation-data="_urlSmokeIcon"> </lottie-player>
+                  <lottie-player class="!w-8" :animation-data="_urlSmokeIcon"> </lottie-player>
                   <span class="ml-2">
                     Notify smoke if value from {{ formValue.rangeNotify.smoke[0] }} ppm to
                     {{ formValue.rangeNotify.smoke[1] }} ppm
@@ -148,7 +142,8 @@
             <n-form-item path="rangeNotify.temperature">
               <template #label>
                 <div class="flex items-center">
-                  <lottie-player class="w-8" :animation-data="_urlTemperatureIcon"> </lottie-player>
+                  <lottie-player class="!w-8" :animation-data="_urlTemperatureIcon">
+                  </lottie-player>
                   <span class="ml-2">
                     Notify temperature 'if value from {{ formValue.rangeNotify.temperature[0] }} °C
                     to {{ formValue.rangeNotify.temperature[1] }} °C
@@ -210,6 +205,7 @@ import {
 import { InfoSensor, SocketPayloadSensor, SensorInfoSummary } from '../interface/sensor'
 import CControl from '@renderer/components/Control.vue'
 import CDeviceStatus from '@renderer/components/DeviceStatus.vue'
+import RemoveDevice from '@renderer/components/RemoveDevice.vue'
 
 import {
   NRadio,
@@ -225,7 +221,7 @@ import {
   NElement,
   useMessage
 } from 'naive-ui'
-import { onUnmounted, reactive, ref, getCurrentInstance, h } from 'vue'
+import { onUnmounted, reactive, ref, h } from 'vue'
 import { useSocketStore } from '../store/socket'
 import { useProfileStore } from '../store/profile'
 import { useSettingStore } from '../store/setting'
@@ -235,6 +231,9 @@ import { LineChart, useLineChart } from 'vue-chart-3'
 import { Chart, registerables, ChartData, Point, ChartOptions } from 'chart.js'
 import { enUS } from 'date-fns/locale'
 import { storeToRefs } from 'pinia'
+// import EventEmitter from 'events'
+
+import api from '@renderer/api'
 
 Chart.register(...registerables)
 
@@ -260,8 +259,10 @@ interface DeviceSetting {
   }
 }
 
-/* get globalProperties */
-const axios = getCurrentInstance()?.appContext.config.globalProperties.$axios
+const _SHOW_DATA_TIME = 300 /* 20 seconds before */
+const _SHOW_DATA_NUM = 100 /* 20 seconds before */
+
+// const _ee = new EventEmitter()
 
 /* socket store */
 const messager = useMessage()
@@ -386,8 +387,8 @@ const handleCheckShowModal = () => {
 }
 
 const submitForm = () => {
-  axios
-    ?.post(`/device/setting?id=${_device.value.id}`, {
+  api
+    .post(`/device/setting?id=${_device.value.id}`, {
       name: formValue.name,
       desc: formValue.desc,
       threshold: {
@@ -418,67 +419,82 @@ const submitForm = () => {
     })
 }
 
-if (axios) {
-  /* get sensor info */
-  axios
-    .get(`/sensor/info/${_device.value.id}?time=${300}`)
-    .then((response) => {
-      const sensorInfo: { info: SensorInfoSummary } = response.data
+/* get sensor info */
+api
+  .get(`/sensor/info/${_device.value.id}?time=${_SHOW_DATA_TIME}`)
+  .then((response) => {
+    const sensorInfo: { info: SensorInfoSummary } = response.data
 
-      _sensor.value.temperature =
-        sensorInfo.info.temperature[sensorInfo.info.temperature.length - 1].value
-      _sensor.value.humidity = sensorInfo.info.humidity[sensorInfo.info.humidity.length - 1].value
-      _sensor.value.smoke = sensorInfo.info.smoke[sensorInfo.info.smoke.length - 1].value
+    _sensor.value.temperature =
+      sensorInfo.info.temperature[sensorInfo.info.temperature.length - 1].value
+    _sensor.value.humidity = sensorInfo.info.humidity[sensorInfo.info.humidity.length - 1].value
+    _sensor.value.smoke = sensorInfo.info.smoke[sensorInfo.info.smoke.length - 1].value
 
-      // console.log('sensor info: ', sensorInfo)
-      _chartData.datasets[0].data = sensorInfo.info.temperature.map(
-        (item) =>
-          ({
-            x: new Date(item.update_at).getTime(),
-            y: Number(item.value)
-          }) as Point
-      )
-      _chartData.datasets[1].data = sensorInfo.info.humidity.map(
-        (item) =>
-          ({
-            x: new Date(item.update_at).getTime(),
-            y: Number(item.value)
-          }) as Point
-      )
-      _chartData.datasets[2].data = sensorInfo.info.smoke.map(
-        (item) =>
-          ({
-            x: new Date(item.update_at).getTime(),
-            y: Number(item.value)
-          }) as Point
-      )
-    })
-    .catch((error) => {
-      if (error instanceof AxiosError) {
-        console.log(error.message)
-      }
-    })
+    // console.log('sensor info: ', sensorInfo)
+    _chartData.datasets[0].data = sensorInfo.info.temperature.map(
+      (item) =>
+        ({
+          x: new Date(item.update_at).getTime(),
+          y: Number(item.value)
+        }) as Point
+    )
+    _chartData.datasets[1].data = sensorInfo.info.humidity.map(
+      (item) =>
+        ({
+          x: new Date(item.update_at).getTime(),
+          y: Number(item.value)
+        }) as Point
+    )
+    _chartData.datasets[2].data = sensorInfo.info.smoke.map(
+      (item) =>
+        ({
+          x: new Date(item.update_at).getTime(),
+          y: Number(item.value)
+        }) as Point
+    )
+  })
+  .catch((error) => {
+    if (error instanceof AxiosError) {
+      console.log(error.message)
+    }
+  })
 
-  /* get device setting */
-  axios
-    .get(`/device/setting?id=${_device.value.id}`)
-    .then((res) => {
-      const { info }: { info: DeviceSettingResponse } = res.data
+/* get device setting */
+api
+  .get(`/device/setting?id=${_device.value.id}`)
+  .then((res) => {
+    const { info }: { info: DeviceSettingResponse } = res.data
 
-      console.log(info)
+    console.log(info)
 
-      formValue.rangeNotify.temperature[0] = info.threshold.temperature.start
-      formValue.rangeNotify.temperature[1] = info.threshold.temperature.end
-      formValue.rangeNotify.humidity[0] = info.threshold.humidity.start
-      formValue.rangeNotify.humidity[1] = info.threshold.humidity.end
-      formValue.rangeNotify.smoke[0] = info.threshold.smoke.start
-      formValue.rangeNotify.smoke[1] = info.threshold.smoke.end
-    })
-    .catch((error) => {
-      if (error instanceof AxiosError) {
-        console.log(error.message)
-      }
-    })
+    formValue.rangeNotify.temperature[0] = info.threshold.temperature.start
+    formValue.rangeNotify.temperature[1] = info.threshold.temperature.end
+    formValue.rangeNotify.humidity[0] = info.threshold.humidity.start
+    formValue.rangeNotify.humidity[1] = info.threshold.humidity.end
+    formValue.rangeNotify.smoke[0] = info.threshold.smoke.start
+    formValue.rangeNotify.smoke[1] = info.threshold.smoke.end
+  })
+  .catch((error) => {
+    if (error instanceof AxiosError) {
+      console.log(error.message)
+    }
+  })
+
+/* add listener */
+console.log('listen at: ', eventNameStatus)
+
+// _ee.on(`${props.device.id}/rename`, function (name: string) {
+//   _device.value.name = name
+// })
+
+const checkDataSheet = (pos: number) => {
+  // console.log('check data sheet: ', _chartData.datasets[pos].data.length)
+  if (_chartData.datasets[pos].data.length < 0) {
+    return
+  }
+  while (_chartData.datasets[pos].data.length > _SHOW_DATA_NUM) {
+    _chartData.datasets[pos].data.shift()
+  }
 }
 
 socketIo.on(eventNameStatus, (payload: { status: NodeStateType }) => {
@@ -518,6 +534,11 @@ socketIo.on(eventNameSensor, (payload: SocketPayloadSensor) => {
     x: new Date(payload.smoke.time_at).getTime(),
     y: Number(payload.smoke.value)
   } as Point)
+
+  /* check data sheet */
+  checkDataSheet(0)
+  checkDataSheet(1)
+  checkDataSheet(2)
 
   let startNotify: boolean = false
   let message: string = ''

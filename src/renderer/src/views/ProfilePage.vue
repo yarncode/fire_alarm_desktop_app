@@ -8,7 +8,7 @@
         </p>
       </template>
       <n-space class="w-1/2" vertical size="large">
-        <lottie-player class="w-20 mx-0" :animation-data="_urlProfileIcon"> </lottie-player>
+        <lottie-player class="!w-20 !mx-0" :animation-data="_urlProfileIcon"> </lottie-player>
         <n-form
           ref="formRef"
           :label-width="80"

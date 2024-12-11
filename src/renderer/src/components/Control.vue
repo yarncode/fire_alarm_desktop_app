@@ -127,6 +127,12 @@ const ioOutAll = reactive<{
   locker: false,
   value: false
 })
+const ioInAll = reactive<{
+  value: boolean
+}>({
+  value: false
+})
+
 const ioDevice = reactive<IoData>({
   input: [],
   output: []
@@ -207,8 +213,19 @@ const changeState = (pos: number, state: boolean) => {
   }
 }
 
-socketIo.value.on(`device/${props.device.id}/input-io`, (data) => {
+socketIo.value.on(`device/${props.device.id}/input-io`, (data: PayloadIo) => {
   console.log('data: ', data)
+
+  if (data?.data) {
+    const { mode, pos, state } = data.data
+    if (mode === 'all') {
+      ioInAll.value = state
+    } else {
+      if (pos >= 0) {
+        ioDevice.input[pos].value = state
+      }
+    }
+  }
 })
 
 socketIo.value.on(`device/${props.device.id}/output-io`, (data: PayloadIo) => {

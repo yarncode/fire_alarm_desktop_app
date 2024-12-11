@@ -31,8 +31,13 @@
 
 <script setup lang="ts">
 import { AxiosError } from 'axios'
-import { getCurrentInstance, reactive } from 'vue'
+import { onUnmounted, reactive } from 'vue'
 import { InfoDevice, DeviceResponse } from '../interface/device'
+import api from '@renderer/api'
+import { useSocketStore } from '../store/socket'
+import { useProfileStore } from '../store/profile'
+
+import { useEventBus } from '@vueuse/core'
 
 /* import lib component */
 import { NGrid, NGridItem, NCollapse, NCollapseItem } from 'naive-ui'
@@ -46,20 +51,38 @@ interface ListDeviceInfo extends DeviceResponse {
 }
 
 /* get globalProperties */
-const axios = getCurrentInstance()?.appContext.config.globalProperties.$axios
 const devices = reactive<{ value: InfoDevice[] }>({ value: [] })
+const { socketIo } = useSocketStore()
+const { id: userId } = useProfileStore()
 
-if (axios) {
-  axios
-    .get('/device/info/list')
-    .then((response) => {
-      const _devices: ListDeviceInfo = response.data
-      devices.value = _devices.info
-    })
-    .catch((error) => {
-      if (error instanceof AxiosError) {
-        console.log(error.message)
-      }
-    })
+const busRemoveDevice = useEventBus<string>('remove-device')
+
+function listenerRemoveDevice(id: string) {
+  console.log(`remove device id: ${id}`)
+  devices.value = devices.value.filter((device) => device.id !== id)
 }
+
+const unsubscribe = busRemoveDevice.on(listenerRemoveDevice)
+
+api
+  .get('/device/info/list')
+  .then((response) => {
+    const _devices: ListDeviceInfo = response.data
+    devices.value = _devices.info
+  })
+  .catch((error) => {
+    if (error instanceof AxiosError) {
+      console.log(error.message)
+    }
+  })
+
+socketIo.on(`${userId}/device/add`, (payload) => {
+  const { id } = JSON.parse(payload)
+  console.log('device add: ', id)
+})
+
+onUnmounted(() => {
+  unsubscribe()
+  socketIo.off(`${userId}/device/add`)
+})
 </script>
