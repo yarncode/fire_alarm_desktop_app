@@ -543,10 +543,7 @@ socketIo.on(eventNameSensor, (payload: SocketPayloadSensor) => {
   let startNotify: boolean = false
   let message: string = ''
 
-  if (
-    _sensor.value.temperature >= formValue.rangeNotify.temperature[0] &&
-    _sensor.value.temperature <= formValue.rangeNotify.temperature[1]
-  ) {
+  if (_sensor.value.temperature >= formValue.rangeNotify.temperature[0]) {
     startNotify = true
     message += '- Temperature cross the threshold value\n'
     highlightSensor.temperature = true
@@ -554,21 +551,18 @@ socketIo.on(eventNameSensor, (payload: SocketPayloadSensor) => {
     highlightSensor.temperature = false
   }
 
-  if (
-    _sensor.value.humidity >= formValue.rangeNotify.humidity[0] &&
-    _sensor.value.humidity <= formValue.rangeNotify.humidity[1]
-  ) {
-    startNotify = true
-    message += '- Humidity cross the threshold value\n'
-    highlightSensor.humidity = true
-  } else {
-    highlightSensor.humidity = false
-  }
+  // if (
+  //   _sensor.value.humidity >= formValue.rangeNotify.humidity[0] &&
+  //   _sensor.value.humidity <= formValue.rangeNotify.humidity[1]
+  // ) {
+  //   startNotify = true
+  //   message += '- Humidity cross the threshold value\n'
+  //   highlightSensor.humidity = true
+  // } else {
+  //   highlightSensor.humidity = false
+  // }
 
-  if (
-    _sensor.value.smoke >= formValue.rangeNotify.smoke[0] &&
-    _sensor.value.smoke <= formValue.rangeNotify.smoke[1]
-  ) {
+  if (_sensor.value.smoke >= formValue.rangeNotify.smoke[0]) {
     startNotify = true
     message += '- Smoke cross the threshold value\n'
     highlightSensor.smoke = true
