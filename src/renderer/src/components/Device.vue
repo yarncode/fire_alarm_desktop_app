@@ -3,7 +3,7 @@
     <c-device-status :status="_device.value.status === 'ONLINE' ? true : false" />
     <n-tabs class="" type="segment" animated>
       <n-tab-pane name="data-log" tab="Monitor">
-        <n-card :title="formValue.name" size="small">
+        <n-card :title="`${formValue.name}`" size="small">
           <div class="relative">
             <div class="flex">
               <div class="flex-1">
@@ -425,33 +425,35 @@ api
   .then((response) => {
     const sensorInfo: { info: SensorInfoSummary } = response.data
 
-    _sensor.value.temperature =
-      sensorInfo.info.temperature[sensorInfo.info.temperature.length - 1].value
-    _sensor.value.humidity = sensorInfo.info.humidity[sensorInfo.info.humidity.length - 1].value
-    _sensor.value.smoke = sensorInfo.info.smoke[sensorInfo.info.smoke.length - 1].value
+    console.log('sensorInfo: ', sensorInfo);
+
+    // _sensor.value.temperature =
+    //   sensorInfo.info.temperature[sensorInfo.info.temperature.length - 1].value
+    // _sensor.value.humidity = sensorInfo.info.humidity[sensorInfo.info.humidity.length - 1].value
+    // _sensor.value.smoke = sensorInfo.info.smoke[sensorInfo.info.smoke.length - 1].value
 
     // console.log('sensor info: ', sensorInfo)
-    _chartData.datasets[0].data = sensorInfo.info.temperature.map(
-      (item) =>
-        ({
-          x: new Date(item.update_at).getTime(),
-          y: Number(item.value)
-        }) as Point
-    )
-    _chartData.datasets[1].data = sensorInfo.info.humidity.map(
-      (item) =>
-        ({
-          x: new Date(item.update_at).getTime(),
-          y: Number(item.value)
-        }) as Point
-    )
-    _chartData.datasets[2].data = sensorInfo.info.smoke.map(
-      (item) =>
-        ({
-          x: new Date(item.update_at).getTime(),
-          y: Number(item.value)
-        }) as Point
-    )
+    // _chartData.datasets[0].data = sensorInfo.info.temperature.map(
+    //   (item) =>
+    //     ({
+    //       x: new Date(item.update_at).getTime(),
+    //       y: Number(item.value)
+    //     }) as Point
+    // )
+    // _chartData.datasets[1].data = sensorInfo.info.humidity.map(
+    //   (item) =>
+    //     ({
+    //       x: new Date(item.update_at).getTime(),
+    //       y: Number(item.value)
+    //     }) as Point
+    // )
+    // _chartData.datasets[2].data = sensorInfo.info.smoke.map(
+    //   (item) =>
+    //     ({
+    //       x: new Date(item.update_at).getTime(),
+    //       y: Number(item.value)
+    //     }) as Point
+    // )
   })
   .catch((error) => {
     if (error instanceof AxiosError) {
@@ -516,6 +518,9 @@ socketIo.on(eventNameSyncThreshold, (payload: NotifyPayload) => {
 })
 
 socketIo.on(eventNameSensor, (payload: SocketPayloadSensor) => {
+
+  // console.log('payload sensor: ', _chartData.datasets[0].data);
+
   _sensor.value.temperature = payload.env.temperature.value || 0
   _sensor.value.humidity = payload.env.humidity.value || 0
   _sensor.value.smoke = payload.smoke.value || 0

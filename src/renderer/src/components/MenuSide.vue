@@ -2,7 +2,6 @@
   <n-list clickable hoverable>
     <n-list-item
       v-for="item in listMenu"
-      v-show="$route.name !== item.nameRoute"
       :key="item.label"
       @click="handleItemClick(item)"
     >
@@ -51,12 +50,12 @@ const listMenu: Array<MenuItemCustom> = [
     nameRoute: 'Home',
     icon: 'fi fi-rr-house-blank'
   },
-  {
-    label: 'Profile',
-    type: 'route',
-    nameRoute: 'Profile',
-    icon: 'fi fi-rr-user'
-  },
+  // {
+  //   label: 'Profile',
+  //   type: 'route',
+  //   nameRoute: 'Profile',
+  //   icon: 'fi fi-rr-user'
+  // },
   {
     label: 'Setting',
     type: 'route',
